@@ -1,30 +1,47 @@
-from decimal import Decimal
+"""Script to seed the subscriptions table with initial data.
+
+This script populates the subscriptions DynamoDB table with sample subscription
+data for testing purposes.
+"""
+
+import os
+from typing import Dict, List
 
 import boto3
 
+# Initialize DynamoDB client
 dynamodb = boto3.resource("dynamodb")
-table = dynamodb.Table("subscriptions")
+table = dynamodb.Table(os.environ.get("TABLE_NAME", "subscriptions"))
 
-subscriptions = [
+# Sample subscription data
+SUBSCRIPTIONS: List[Dict] = [
     {
-        "user_id": "user-123",
+        "user_id": "test_user",
         "subscription_id": "sub-001",
         "name": "Spotify",
-        "amount": Decimal("9.99"),
+        "amount": 9.99,
         "frequency": "monthly",
         "category": "Entertainment",
-        "start_date": "2024-11-01",
+        "start_date": "2024-01-01",
     },
     {
-        "user_id": "user-123",
+        "user_id": "test_user",
         "subscription_id": "sub-002",
         "name": "Netflix",
-        "amount": Decimal("15.99"),
+        "amount": 15.99,
         "frequency": "monthly",
         "category": "Entertainment",
-        "start_date": "2024-10-15",
+        "start_date": "2024-01-01",
     },
 ]
 
-for item in subscriptions:
-    table.put_item(Item=item)
+
+def seed_subscriptions() -> None:
+    """Seed the subscriptions table with initial data."""
+    for subscription in SUBSCRIPTIONS:
+        table.put_item(Item=subscription)
+        print(f"Added subscription: {subscription['name']}")
+
+
+if __name__ == "__main__":
+    seed_subscriptions()
