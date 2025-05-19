@@ -5,6 +5,7 @@ for testing purposes.
 """
 
 import os
+from decimal import Decimal
 from typing import Dict, List
 
 import boto3
@@ -20,8 +21,8 @@ GOALS: List[Dict] = [
         "goal_id": "goal-001",
         "name": "Buy a House",
         "description": "Save for a down payment on a house",
-        "target_amount": 50000,
-        "current_amount": 10000,
+        "target_amount": Decimal("50000"),
+        "current_amount": Decimal("10000"),
         "target_date": "2025-12-31",
         "status": "in_progress",
     },
@@ -30,8 +31,8 @@ GOALS: List[Dict] = [
         "goal_id": "goal-002",
         "name": "Emergency Fund",
         "description": "Build emergency fund",
-        "target_amount": 25000,
-        "current_amount": 15000,
+        "target_amount": Decimal("25000"),
+        "current_amount": Decimal("15000"),
         "target_date": "2024-12-31",
         "status": "in_progress",
     },

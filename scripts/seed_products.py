@@ -5,6 +5,7 @@ data for testing purposes.
 """
 
 import os
+from decimal import Decimal
 from typing import Dict, List
 
 import boto3
@@ -19,9 +20,9 @@ PRODUCTS: List[Dict] = [
         "product_id": "prod-001",
         "name": "Mortgage",
         "description": "30-year fixed rate mortgage",
-        "min_amount": 50000,
-        "max_amount": 500000,
-        "interest_rate": 6.5,
+        "min_amount": Decimal("50000"),
+        "max_amount": Decimal("500000"),
+        "interest_rate": Decimal("6.5"),
         "term_years": 30,
         "type": "loan",
     },
@@ -29,9 +30,9 @@ PRODUCTS: List[Dict] = [
         "product_id": "prod-002",
         "name": "Auto Loan",
         "description": "5-year auto loan",
-        "min_amount": 10000,
-        "max_amount": 100000,
-        "interest_rate": 5.5,
+        "min_amount": Decimal("10000"),
+        "max_amount": Decimal("100000"),
+        "interest_rate": Decimal("5.5"),
         "term_years": 5,
         "type": "loan",
     },

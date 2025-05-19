@@ -285,143 +285,31 @@ async def handle_user_request(user_prompt: str, user_id: str):
 
 Remember: This infrastructure is designed to be extended. Feel free to add new functions to the catalog and update the function matcher's training data as needed.
 
-# Pathway Builder Tools
+## Components
 
-This repository contains a suite of tools (and a test script) for interacting with AWS Lambda functions (e.g. a "function matcher" and functions for subscriptions, products, and financial goals) via natural language prompts.
+### CLI Interface
 
-## Overview
+The project includes a command-line interface for interacting with the financial tools system. See [CLI Documentation](financial_tools/cli/README.md) for details.
 
-- **scripts/test_functions.py** is a Python script that:
-  - Calls a "function matcher" Lambda (using boto3) to recommend a function (and parameters) based on a natural language prompt.
-  - (If a "body" field is present in the response, it is parsed (and flattened) so that the function_id, parameters, title, and description are returned at the top level.)
-  - Executes the recommended (or a mapped) function (for example, "manage_goals" (or "Manage Financial Goals") is mapped to "get_goals" (with action="get") for read actions) via the AWS Lambda client.
-  - Formats the response (for subscriptions, products, and goals) so that if a key (e.g. "subscriptions", "products", "goals") is present, it is used; otherwise, it falls back to "Items".
-  - Displays a user-friendly output (or a raw JSON dump for unknown functions).
+Features:
+- 🧾 Subscription management
+- 🧰 Financial product discovery
+- 🎯 Goal tracking and management
 
-## Prerequisites
-
-- Python 3.6 (or later) and pip (or a virtual environment).
-- AWS credentials (and boto3) configured (e.g. via ~/.aws/credentials or environment variables).
-- AWS Lambda functions (e.g. "function_matcher", "subscriptions", "products", "goals") deployed (and configured) in your AWS account.
-
-## Installation
-
-Clone the repo (or download the scripts) and install (or activate) your Python environment. (No extra dependencies are required if boto3 is installed.)
-
-## Usage
-
-Run the test script (e.g. from the repo root) as follows:
-
+Quick start:
 ```bash
-python3 scripts/test_functions.py "your prompt" [--user-id <user_id>] [--skip-execution]
+# Install the package
+pip install -e .
+
+# Run the CLI
+financial-tools
 ```
 
-### Examples
+### Lambda Functions
 
-- **Show subscriptions (for a test user):**
+The system includes several AWS Lambda functions for processing requests:
 
-  ```bash
-  python3 scripts/test_functions.py "Show me all my monthly subscriptions"
-  ```
-
-  Expected output (if subscriptions exist):
-
-  ```
-  🤖 Processing your request...
-
-  📋 Function Matcher Recommendation:
-  Function: Get User Subscriptions
-  Description: Retrieves all active subscriptions for a user, including subscription name, amount, frequency, and category.
-  Parameters: {}
-
-  ⚡ Executing function...
-
-  🐞 Raw Lambda Response:
-  { "subscriptions": [ { "user_id": "test_user", "subscription_id": "sub-001", "name": "Spotify", "amount": 9.99, "frequency": "monthly", "category": "Entertainment", "start_date": "2024-11-01" }, { "user_id": "test_user", "subscription_id": "sub-002", "name": "Netflix", "amount": 15.99, "frequency": "monthly", "category": "Entertainment", "start_date": "2024-10-15" } ] }
-
-  📊 Result:
-
-  Subscriptions:
-  - Spotify: $9.99 (monthly)
-  - Netflix: $15.99 (monthly)
-  ```
-
-- **Show available products (for a test user):**
-
-  ```bash
-  python3 scripts/test_functions.py "Show me all available products"
-  ```
-
-  Expected output (if products exist):
-
-  ```
-  🤖 Processing your request...
-
-  📋 Function Matcher Recommendation:
-  Function: Get Financial Products
-  Description: Retrieves available financial products (e.g. loans) with details (interest rates, terms, amount ranges).
-  Parameters: {}
-
-  ⚡ Executing function...
-
-  🐞 Raw Lambda Response:
-  { "products": [ { "product_id": "prod-001", "name": "Mortgage", "description": "30-year fixed rate mortgage", "min_amount": 50000, "max_amount": 500000, "interest_rate": 6.5, "term_years": 30, "type": "loan" }, { "product_id": "prod-002", "name": "Auto Loan", "description": "5-year auto loan", "min_amount": 10000, "max_amount": 100000, "interest_rate": 5.5, "term_years": 5, "type": "loan" } ] }
-
-  📊 Result:
-
-  Available Products:
-  - Mortgage: 30-year fixed rate mortgage
-    Amount Range: $50000 - $500000
-  - Auto Loan: 5-year auto loan
-    Amount Range: $10000 - $100000
-  ```
-
-- **Show financial goals (for a test user):**
-
-  (Note that the function matcher returns "Manage Financial Goals" (or "manage_goals"), which is mapped (in the script) to "get_goals" (with action="get") for read actions.)
-
-  ```bash
-  python3 scripts/test_functions.py "Show me my financial goals"
-  ```
-
-  Expected output (if goals exist):
-
-  ```
-  🤖 Processing your request...
-
-  📋 Function Matcher Recommendation:
-  Function: Manage Financial Goals
-  Description: Create, read, update, and delete financial goals. Track progress towards savings targets, emergency funds, and other financial objectives.
-  Parameters: {}
-
-  ⚡ Executing function...
-
-  🐞 Raw Lambda Response:
-  { "goals": [ { "goal_id": "goal-001", "user_id": "test_user", "name": "Vacation Fund", "current_amount": 1200, "target_amount": 3000, "category": "Travel", "due_date": "2024-12-31" }, { "goal_id": "goal-002", "user_id": "test_user", "name": "Emergency Fund", "current_amount": 3500, "target_amount": 10000, "category": "Savings", "due_date": "2024-06-30" } ] }
-
-  📊 Result:
-
-  Financial Goals:
-  - Vacation Fund: $1200 / $3000 (Due: 2024-12-31)
-  - Emergency Fund: $3500 / $10000 (Due: 2024-06-30)
-  ```
-
-- **Skip execution (only show the function matcher recommendation):**
-
-  ```bash
-  python3 scripts/test_functions.py "your prompt" --skip-execution
-  ```
-
-- **Specify a user (e.g. "user-123"):**
-
-  ```bash
-  python3 scripts/test_functions.py "your prompt" --user-id user-123
-  ```
-
- (Adjust the prompt and expected output as needed.)
-
-## Notes
-
-- The script (scripts/test_functions.py) is intended for testing (or demo) purposes. (It is not intended for production use.)
-- Ensure that your AWS Lambda functions (e.g. "function_matcher", "subscriptions", "products", "goals") are deployed (and configured) in your AWS account (and that your AWS credentials (and boto3) are set up) so that the script can invoke them.
-- (If you'd like to test "put" or "delete" goals (or other flows), please adjust the prompt (and parameters) accordingly.)
+- `function_matcher`: Matches natural language requests to appropriate functions
+- `subscriptions`: Manages subscription data
+- `products`: Handles financial product information
+- `goals`: Manages financial goals

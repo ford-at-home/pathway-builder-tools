@@ -62,6 +62,23 @@ FUNCTIONS: List[Dict] = [
             "Delete my vacation fund goal",
         ],
     },
+    {
+        "function_id": "summarize",
+        "title": "Summarize Financial Data",
+        "tool_title": "Financial Summary Generator",
+        "description": (
+            "Generates a natural language summary of a user's financial data, "
+            "including subscriptions, available products, and financial goals. "
+            "Highlights key insights and patterns."
+        ),
+        "category": "summary",
+        "example_prompts": [
+            "Summarize my financial situation",
+            "Give me an overview of my finances",
+            "What's my current financial status?",
+            "Show me a summary of my subscriptions and goals",
+        ],
+    },
 ]
 
 

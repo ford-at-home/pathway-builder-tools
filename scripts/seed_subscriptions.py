@@ -5,6 +5,7 @@ data for testing purposes.
 """
 
 import os
+from decimal import Decimal
 from typing import Dict, List
 
 import boto3
@@ -19,7 +20,7 @@ SUBSCRIPTIONS: List[Dict] = [
         "user_id": "test_user",
         "subscription_id": "sub-001",
         "name": "Spotify",
-        "amount": 9.99,
+        "amount": Decimal("9.99"),
         "frequency": "monthly",
         "category": "Entertainment",
         "start_date": "2024-01-01",
@@ -28,7 +29,7 @@ SUBSCRIPTIONS: List[Dict] = [
         "user_id": "test_user",
         "subscription_id": "sub-002",
         "name": "Netflix",
-        "amount": 15.99,
+        "amount": Decimal("15.99"),
         "frequency": "monthly",
         "category": "Entertainment",
         "start_date": "2024-01-01",

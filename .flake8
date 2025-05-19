@@ -1,0 +1,39 @@
+[flake8]
+max-line-length = 100
+extend-ignore =
+    # Allow longer lines in docstrings and comments
+    E501,
+    # Allow missing docstrings in __init__ methods
+    D107,
+    # Allow unused imports in __init__ files
+    F401,
+    # Allow bare except statements in certain cases
+    E722,
+    # Allow multiple statements on one line in certain cases
+    E701,
+    # Allow comparison to True/False
+    E712,
+    # Allow unused variables in certain cases
+    F841
+
+# Exclude certain directories
+exclude =
+    .git,
+    __pycache__,
+    build,
+    dist,
+    *.egg-info,
+    .venv,
+    venv,
+    .env,
+    .tox
+
+# Per-file-ignores
+# Ignore certain rules in test files
+per-file-ignores =
+    # Ignore docstring requirements in test files
+    tests/*: D100,D101,D102,D103,D104,D105,D106,D107
+    # Ignore line length in test files
+    tests/*: E501
+    # Ignore unused imports in test files
+    tests/*: F401

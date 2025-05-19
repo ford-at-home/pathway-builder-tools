@@ -5,8 +5,9 @@ PYTHON_VERSION := 3.12
 VENV := .venv
 PYTHON := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
-CDK := cdk
-CDK_APP := "python3 cdk/app.py"
+CDK := cdk  # Use system CDK
+CDK_APP := "$(PYTHON) cdk/app.py"
+PRE_COMMIT := $(VENV)/bin/pre-commit
 
 # AWS region (default to us-east-1 if not set)
 AWS_REGION ?= us-east-1
@@ -27,17 +28,17 @@ venv: check-tools
 	@$(PIP) install --upgrade pip
 	@$(PIP) install -r requirements.txt
 	@echo "Installing pre-commit hooks..."
-	@pre-commit install
+	@$(PRE_COMMIT) install
 
 # Bootstrap CDK environment
 bootstrap: venv
 	@echo "Bootstrapping CDK environment..."
-	@cdk bootstrap --app $(CDK_APP) aws://$(shell aws sts get-caller-identity --query Account --output text)/$(AWS_REGION)
+	@$(CDK) bootstrap --app $(CDK_APP) aws://$(shell aws sts get-caller-identity --query Account --output text)/$(AWS_REGION)
 
 # Deploy the stack
 deploy: check-env
 	@echo "Deploying CDK stack..."
-	@cdk deploy --app $(CDK_APP) --region $(AWS_REGION)
+	@$(CDK) deploy --app $(CDK_APP) --region $(AWS_REGION)
 
 # Seed the database tables
 seed: check-env
@@ -47,12 +48,12 @@ seed: check-env
 # Destroy the stack
 destroy: check-env
 	@echo "Destroying CDK stack..."
-	@cdk destroy --app $(CDK_APP) --region $(AWS_REGION)
+	@$(CDK) destroy --app $(CDK_APP) --region $(AWS_REGION)
 
 # Synthesize CloudFormation template
 synth: check-env
 	@echo "Synthesizing CloudFormation template..."
-	@cdk synth --app $(CDK_APP)
+	@$(CDK) synth --app $(CDK_APP)
 
 # Check if virtual environment exists
 check-env:

@@ -121,13 +121,37 @@ class FinancialToolsStack(Stack):
             timeout=Duration.seconds(30),
         )
 
-        # Grant Bedrock permissions
-        function_matcher_fn.add_to_role_policy(
+        # Create summarize Lambda function
+        summarize_fn = _lambda.Function(
+            self,
+            "SummarizeFunction",
+            function_name="summarize",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            handler="summarize.handler",
+            code=_lambda.Code.from_asset(lambda_dir),
+            timeout=Duration.seconds(60),  # Longer timeout for Bedrock calls
+        )
+
+        # Grant Bedrock permissions to both functions
+        for fn in [function_matcher_fn, summarize_fn]:
+            fn.add_to_role_policy(
+                iam.PolicyStatement(
+                    actions=["bedrock:InvokeModel"],
+                    resources=[
+                        "arn:aws:bedrock:*::foundation-model/"
+                        "anthropic.claude-3-sonnet-20240229-v1:0"
+                    ],
+                )
+            )
+
+        # Grant Lambda invoke permissions to summarize function
+        summarize_fn.add_to_role_policy(
             iam.PolicyStatement(
-                actions=["bedrock:InvokeModel"],
+                actions=["lambda:InvokeFunction"],
                 resources=[
-                    "arn:aws:bedrock:*::foundation-model/"
-                    "anthropic.claude-3-sonnet-20240229-v1:0"
+                    subscriptions_fn.function_arn,
+                    products_fn.function_arn,
+                    goals_fn.function_arn,
                 ],
             )
         )
