@@ -1,0 +1,28 @@
+# AWS CDK Core
+aws-cdk-lib>=2.0.0
+constructs>=10.0.0
+
+# AWS SDK
+boto3>=1.34.0
+botocore>=1.34.0
+
+# Testing
+pytest>=8.0.0
+pytest-cov>=4.1.0
+pytest-mock>=3.12.0
+moto>=5.0.0  # For AWS service mocking
+
+# Development Tools
+black>=24.1.0  # Code formatting
+isort>=5.13.0  # Import sorting
+flake8>=7.0.0  # Linting
+mypy>=1.8.0   # Type checking
+pre-commit>=3.6.0  # Git hooks
+
+# Local Development
+python-dotenv>=1.0.0  # Environment variable management
+localstack>=3.0.0    # Local AWS cloud stack
+
+# Documentation
+mkdocs>=1.5.0
+mkdocs-material>=9.5.0
