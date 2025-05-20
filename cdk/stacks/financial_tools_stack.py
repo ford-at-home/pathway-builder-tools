@@ -1,7 +1,41 @@
 """CDK stack for financial tools infrastructure.
 
-This module defines the AWS CDK stack that creates the infrastructure for the
-financial tools application, including DynamoDB tables and Lambda functions.
+This module defines the AWS CDK stack that creates and configures the complete
+infrastructure for the financial tools application. The stack implements a
+serverless architecture using AWS Lambda and DynamoDB, with the following
+components:
+
+Infrastructure Components:
+    1. DynamoDB Tables:
+        - subscriptions: User subscription data
+        - financial_products: Available financial products
+        - financial_goals: User financial goals
+        - function_catalog: Function matching catalog
+
+    2. Lambda Functions:
+        - subscriptions: Manage user subscriptions
+        - products: List financial products
+        - goals: Manage financial goals
+        - function_matcher: Match user requests to functions
+        - summarize: Generate natural language summaries
+
+    3. IAM Permissions:
+        - Lambda to DynamoDB access
+        - Lambda to Bedrock access
+        - Lambda to Lambda invocation
+
+The stack is designed for development and production use, with:
+    - Configurable removal policies
+    - Appropriate timeouts
+    - Secure IAM permissions
+    - Environment variable management
+
+Example:
+    >>> from aws_cdk import App
+    >>> from cdk.stacks.financial_tools_stack import FinancialToolsStack
+    >>> app = App()
+    >>> stack = FinancialToolsStack(app, "FinancialToolsStack")
+    >>> app.synth()
 """
 
 import os
@@ -17,19 +51,108 @@ from constructs import Construct
 class FinancialToolsStack(Stack):
     """CDK stack for financial tools infrastructure.
 
-    This stack creates:
-    - DynamoDB tables for subscriptions, products, goals, and function catalog
-    - Lambda functions for managing subscriptions, products, goals, and function matching
-    - IAM permissions for Lambda functions to access DynamoDB and Bedrock
+    This stack creates and configures all AWS resources needed for the
+    financial tools application. It implements a complete serverless
+    architecture with proper security, scalability, and maintainability.
+
+    Resource Configuration:
+        1. DynamoDB Tables:
+            - subscriptions:
+                * Partition key: user_id (String)
+                * Sort key: subscription_id (String)
+                * Purpose: Store user subscription data
+            - financial_products:
+                * Partition key: product_id (String)
+                * Purpose: Store available financial products
+            - financial_goals:
+                * Partition key: user_id (String)
+                * Sort key: goal_id (String)
+                * Purpose: Store user financial goals
+            - function_catalog:
+                * Partition key: function_id (String)
+                * Purpose: Store function matching catalog
+
+        2. Lambda Functions:
+            - subscriptions:
+                * Runtime: Python 3.12
+                * Timeout: 30 seconds
+                * Permissions: Read subscriptions table
+            - products:
+                * Runtime: Python 3.12
+                * Timeout: 30 seconds
+                * Permissions: Read products table
+            - goals:
+                * Runtime: Python 3.12
+                * Timeout: 30 seconds
+                * Permissions: Read/write goals table
+            - function_matcher:
+                * Runtime: Python 3.12
+                * Timeout: 30 seconds
+                * Permissions: Read catalog, invoke Bedrock
+            - summarize:
+                * Runtime: Python 3.12
+                * Timeout: 60 seconds
+                * Permissions: Invoke other Lambdas, invoke Bedrock
+
+        3. IAM Permissions:
+            - Lambda to DynamoDB:
+                * subscriptions: Read access
+                * products: Read access
+                * goals: Read/write access
+                * function_catalog: Read access
+            - Lambda to Bedrock:
+                * function_matcher: Invoke Claude model
+                * summarize: Invoke Claude model
+            - Lambda to Lambda:
+                * summarize: Invoke other functions
+
+    Development Features:
+        - RemovalPolicy.DESTROY for easy cleanup
+        - Environment variables for configuration
+        - Appropriate timeouts for operations
+        - Secure IAM permissions
+
+    Example:
+        >>> from aws_cdk import App
+        >>> app = App()
+        >>> stack = FinancialToolsStack(app, "FinancialToolsStack")
+        >>> # Deploy the stack
+        >>> app.synth()
     """
 
     def __init__(self, scope: Construct, id: str, **kwargs: Any) -> None:
         """Initialize the financial tools stack.
 
+        This constructor creates and configures all AWS resources needed for
+        the financial tools application. It sets up:
+            1. DynamoDB tables with appropriate keys and policies
+            2. Lambda functions with proper runtime and permissions
+            3. IAM roles and policies for secure access
+            4. Environment variables for configuration
+
+        The stack is designed to be deployed in a single operation, with all
+        resources properly configured and connected.
+
         Args:
-            scope: The scope in which this stack is defined
-            id: The identifier for this stack
-            **kwargs: Additional keyword arguments passed to the parent class
+            scope: The scope in which this stack is defined. This is typically
+                an App instance from aws_cdk.App.
+            id: The identifier for this stack. This should be unique within
+                the scope and is used to identify the stack in CloudFormation.
+            **kwargs: Additional keyword arguments passed to the parent class.
+                These can include:
+                - env: The environment to deploy to
+                - description: Stack description
+                - tags: Resource tags
+
+        Example:
+            >>> from aws_cdk import App
+            >>> app = App()
+            >>> stack = FinancialToolsStack(
+            ...     app,
+            ...     "FinancialToolsStack",
+            ...     description="Financial tools infrastructure",
+            ...     env={"region": "us-west-2"}
+            ... )
         """
         super().__init__(scope, id, **kwargs)
 
