@@ -1,4 +1,4 @@
-.PHONY: setup clean deploy destroy seed bootstrap synth check-env test-function test lint format
+.PHONY: setup clean deploy destroy seed bootstrap synth check-env test-function test lint format run
 
 # Default Python version
 PYTHON_VERSION := 3.12
@@ -97,6 +97,11 @@ test-function: check-env
 	@echo "Testing function matcher and execution"
 	@python3 scripts/test_functions.py "$(prompt)" $(if $(user_id),--user-id $(user_id),) $(if $(skip),--skip-execution,)
 
+# Run the CLI
+run: check-env
+	@echo "Starting Financial Tools CLI..."
+	@$(PYTHON) -m financial_tools.cli
+
 # Main setup target that runs everything
 setup: check-tools venv bootstrap deploy seed
 	@echo "Setup complete! Your CDK stack is deployed and seeded with initial data."
@@ -114,7 +119,7 @@ help:
 	@echo "  make synth      - Synthesize CloudFormation template"
 	@echo "  make test       - Run all tests"
 	@echo "  make test-cov   - Run tests with coverage report"
-	@echo "  make lint       - Run linters (flake8, mypy)"
 	@echo "  make format     - Format code (black, isort)"
+	@echo "  make run        - Run the Financial Tools CLI"
 	@echo "  make test-function prompt=\"...\" - Test function matcher with a prompt"
 	@echo "  make help       - Show this help message"

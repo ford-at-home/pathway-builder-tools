@@ -1,32 +1,13 @@
-"""Main entry point for the financial tools application.
-
-This module provides the main entry point for running the financial tools
-application, including both CLI and API interfaces.
-"""
-
 import json
 from typing import Any, Dict, Optional
 
 import boto3
 
-from financial_tools.cli.interface import CLI
-from financial_tools.core.function_matcher import FunctionMatcher
-from financial_tools.core.logging_config import setup_logging
-
-# Set up logging for the main module
-# This helps track application startup and any errors
-logger = setup_logging(__name__)
-
 
 class LambdaClient:
     """Handles all Lambda function invocations."""
 
-    def __init__(self) -> None:
-        """Initialize the Lambda client with AWS clients and function mappings.
-
-        Sets up the boto3 Lambda client and defines the mapping of tool names
-        to their corresponding Lambda function names.
-        """
+    def __init__(self):
         self.lambda_client = boto3.client("lambda")
         self.tool_picker_function = "tool_picker"
         self.summarizer_function = "summarizer"
@@ -68,12 +49,7 @@ class LambdaClient:
 class ResponseFormatter:
     """Handles formatting and displaying responses to the user."""
 
-    def __init__(self, lambda_client: LambdaClient) -> None:
-        """Initialize the response formatter with a Lambda client.
-
-        Args:
-            lambda_client: The Lambda client to use for summarizing responses
-        """
+    def __init__(self, lambda_client: LambdaClient):
         self.lambda_client = lambda_client
 
     def format_summary(self, response: Dict[str, Any], tool_name: str) -> str:
@@ -96,13 +72,7 @@ class FinancialAssistantCLI:
         self,
         lambda_client: Optional[LambdaClient] = None,
         response_formatter: Optional[ResponseFormatter] = None,
-    ) -> None:
-        """Initialize the financial assistant CLI.
-
-        Args:
-            lambda_client: Optional Lambda client for function execution
-            response_formatter: Optional formatter for response display
-        """
+    ):
         self.lambda_client = lambda_client or LambdaClient()
         self.response_formatter = response_formatter or ResponseFormatter(
             self.lambda_client
@@ -149,65 +119,24 @@ How can I help today?
             return self.response_formatter.format_error(str(e))
 
 
-class FinancialToolsAPI:
-    """API interface for financial tools.
+def main():
+    """Main entry point for the CLI application."""
+    cli = FinancialAssistantCLI()
+    cli.display_welcome_message()
 
-    This class provides a programmatic interface to the financial tools system,
-    allowing other applications to interact with it via function calls rather
-    than the CLI.
-    """
-
-    def __init__(self) -> None:
-        """Initialize the API with a function matcher."""
-        # Create function matcher for handling requests
-        # This will be used to match natural language to specific functions
-        self.function_matcher = FunctionMatcher()
-
-    def process_request(self, request: str) -> Dict[str, Any]:
-        """Process a request and return the response.
-
-        Args:
-            request: The natural language request to process
-
-        Returns:
-            Dict containing the response data or error information
-        """
+    while True:
         try:
-            # Match the request to a function
-            # This uses natural language processing to understand intent
-            match_result = self.function_matcher.match_function(request)
+            response = cli.handle_user_request()
+            print(f"\n{response}\n")
 
-            # Handle case where no function matches
-            if match_result.get("statusCode") == 404:
-                return {"status": "error", "message": "No matching function found"}
+            # Ask if the user wants to continue
+            if input("Would you like to ask something else? (y/n): ").lower() != "y":
+                print("\n👋 Thanks for using the financial assistant. Goodbye!")
+                break
 
-            # Get the matched function ID
-            function_id = match_result.get("function_id")
-            if not function_id or function_id.lower() == "none":
-                return {"status": "error", "message": "Could not understand request"}
-
-            # Execute the matched function
-            # This will call the appropriate Lambda function
-            response = self.function_matcher.execute_function(function_id)
-            return {"status": "success", "data": response}
-
-        except Exception as e:
-            # Log any errors that occur
-            # This helps with debugging and improving the system
-            logger.error(f"Error processing request: {str(e)}", exc_info=True)
-            return {"status": "error", "message": str(e)}
-
-
-def main() -> None:
-    """Run the financial tools application.
-
-    This function serves as the main entry point for the application.
-    It can be used to start either the CLI or API interface.
-    """
-    # Create and run the CLI
-    # This is the default interface for users
-    cli = CLI()
-    cli.run()
+        except KeyboardInterrupt:
+            print("\n\n👋 Thanks for using the financial assistant. Goodbye!")
+            break
 
 
 if __name__ == "__main__":

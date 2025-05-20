@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """Test script for function matcher and Lambda function execution."""
-
 import argparse
 import json
 import sys
 import unittest
-
-import boto3
+from typing import Any, Dict
 
 from financial_tools.core import (
     call_function_matcher,

@@ -1,105 +1,109 @@
-"""Tests for the main application module."""
+from unittest.mock import Mock, patch
 
-import unittest
-from unittest.mock import patch
+import pytest
 
-from financial_tools.cli.interface import FinancialAssistantCLI, main
+from main import FinancialAssistantCLI, LambdaClient, ResponseFormatter
 
 
-class TestMainCLI(unittest.TestCase):
-    """Test cases for the main CLI application."""
+class TestFinancialAssistantCLI:
+    @pytest.fixture
+    def mock_lambda_client(self):
+        return Mock(spec=LambdaClient)
 
-    def setUp(self) -> None:
-        """Set up test fixtures."""
-        self.cli = FinancialAssistantCLI()
+    @pytest.fixture
+    def mock_response_formatter(self):
+        return Mock(spec=ResponseFormatter)
 
-    def test_cli_initialization(self) -> None:
-        """Test CLI initialization with default user ID."""
-        self.assertEqual(self.cli.user_id, "test_user")
+    @pytest.fixture
+    def cli(self, mock_lambda_client, mock_response_formatter):
+        return FinancialAssistantCLI(mock_lambda_client, mock_response_formatter)
 
-    def test_cli_custom_user_id(self) -> None:
-        """Test CLI initialization with custom user ID."""
-        cli = FinancialAssistantCLI(user_id="custom_user")
-        self.assertEqual(cli.user_id, "custom_user")
+    def test_display_welcome_message(self, cli, capsys):
+        cli.display_welcome_message()
+        captured = capsys.readouterr()
+        assert "👋 Hi, I'm your CLI financial tool assistant" in captured.out
+        assert "I can help you with 3 things:" in captured.out
+        assert "1. 🧾 Subscriptions" in captured.out
+        assert "2. 🧰 Financial Products" in captured.out
+        assert "3. 🎯 Financial Goals" in captured.out
 
-    def test_main_flow(self) -> None:
-        """Test the main CLI flow with a complete interaction."""
-        input_sequence = ["show subscriptions", "n"]
-        with (
-            patch("builtins.input", side_effect=input_sequence),
-            patch("builtins.print") as mock_print,
-            patch(
-                "financial_tools.core.function_matcher.call_function_matcher",
-                return_value={
-                    "function_id": "get_subscriptions",
-                    "parameters": {},
-                },
-            ),
-            patch(
-                "financial_tools.core.function_executor.execute_function",
-                return_value={
-                    "subscriptions": [
-                        {
-                            "name": "Netflix",
-                            "amount": 15.99,
-                            "frequency": "monthly",
-                        }
-                    ]
-                },
-            ),
-        ):
-            main()
-            # Verify welcome message was displayed
-            welcome_calls = [
-                call
-                for call in mock_print.call_args_list
-                if "CLI financial tool assistant" in str(call)
+    def test_handle_valid_subscriptions_request(
+        self, cli, mock_lambda_client, mock_response_formatter
+    ):
+        # Mock Lambda responses
+        mock_lambda_client.pick_tool.return_value = {"tool": "subscriptions"}
+        mock_lambda_client.call_tool.return_value = {
+            "subscriptions": [
+                {"name": "Netflix", "amount": 15.99, "frequency": "monthly"}
             ]
-            self.assertTrue(len(welcome_calls) > 0)
+        }
+        mock_response_formatter.format_summary.return_value = (
+            "You have 1 active subscription: Netflix at $15.99/month"
+        )
 
-            # Verify subscription info was displayed
-            sub_calls = [
-                call for call in mock_print.call_args_list if "Netflix" in str(call)
+        # Simulate user input
+        with patch("builtins.input", return_value="show me my subscriptions"):
+            response = cli.handle_user_request()
+
+        assert response == "You have 1 active subscription: Netflix at $15.99/month"
+        mock_lambda_client.pick_tool.assert_called_once_with("show me my subscriptions")
+        mock_lambda_client.call_tool.assert_called_once_with("subscriptions", {})
+        mock_response_formatter.format_summary.assert_called_once()
+
+    def test_handle_invalid_request(self, cli, mock_lambda_client):
+        mock_lambda_client.pick_tool.return_value = {"tool": "none"}
+
+        with patch("builtins.input", return_value="tell me a joke"):
+            response = cli.handle_user_request()
+
+        assert "🤷‍♂️ I'm not equipped to help with that request" in response
+        mock_lambda_client.pick_tool.assert_called_once_with("tell me a joke")
+        mock_lambda_client.call_tool.assert_not_called()
+
+    def test_handle_lambda_error(self, cli, mock_lambda_client):
+        mock_lambda_client.pick_tool.side_effect = Exception("Lambda error")
+
+        with patch("builtins.input", return_value="show my subscriptions"):
+            response = cli.handle_user_request()
+
+        assert "Sorry, I encountered an error" in response
+
+
+class TestLambdaClient:
+    @pytest.fixture
+    def lambda_client(self):
+        return LambdaClient()
+
+    def test_pick_tool(self, lambda_client):
+        # This would be an integration test with actual Lambda
+        # For now, we'll mock the boto3 client
+        with patch("boto3.client") as mock_boto:
+            mock_lambda = Mock()
+            mock_boto.return_value = mock_lambda
+            mock_lambda.invoke.return_value = {"Payload": '{"tool": "subscriptions"}'}
+
+            result = lambda_client.pick_tool("show my subscriptions")
+            assert result == {"tool": "subscriptions"}
+
+
+class TestResponseFormatter:
+    @pytest.fixture
+    def formatter(self):
+        return ResponseFormatter()
+
+    def test_format_summary(self, formatter):
+        raw_response = {
+            "goals": [
+                {"name": "Vacation", "target_amount": 3000, "current_amount": 1200}
             ]
-            self.assertTrue(len(sub_calls) > 0)
+        }
 
+        with patch("boto3.client") as mock_boto:
+            mock_lambda = Mock()
+            mock_boto.return_value = mock_lambda
+            mock_lambda.invoke.return_value = {
+                "Payload": '"You have saved $1200 towards your $3000 vacation goal"'
+            }
 
-class TestCLIErrorHandling(unittest.TestCase):
-    """Test cases for CLI error handling."""
-
-    def test_handle_function_matcher_error(self) -> None:
-        """Test handling of function matcher errors."""
-        input_sequence = ["show subscriptions", "n"]
-        with (
-            patch("builtins.input", side_effect=input_sequence),
-            patch("builtins.print") as mock_print,
-            patch(
-                "financial_tools.core.function_matcher.call_function_matcher",
-                side_effect=Exception("Test error"),
-            ),
-        ):
-            main()
-            error_calls = [
-                call for call in mock_print.call_args_list if "Error" in str(call)
-            ]
-            self.assertTrue(len(error_calls) > 0)
-
-
-class TestCLIExitHandling(unittest.TestCase):
-    """Test cases for CLI exit handling."""
-
-    def test_handle_keyboard_interrupt(self) -> None:
-        """Test handling of keyboard interrupt."""
-        with (
-            patch("builtins.input", side_effect=KeyboardInterrupt()),
-            patch("builtins.print") as mock_print,
-        ):
-            main()
-            goodbye_calls = [
-                call for call in mock_print.call_args_list if "Goodbye" in str(call)
-            ]
-            self.assertTrue(len(goodbye_calls) > 0)
-
-
-if __name__ == "__main__":
-    unittest.main()
+            summary = formatter.format_summary(raw_response, "goals")
+            assert "You have saved $1200" in summary

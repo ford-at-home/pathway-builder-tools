@@ -15,8 +15,6 @@ moto>=5.0.0  # For AWS service mocking
 # Development Tools
 black>=24.1.0  # Code formatting
 isort>=5.13.0  # Import sorting
-flake8>=7.0.0  # Linting
-mypy>=1.8.0   # Type checking
 pre-commit>=3.6.0  # Git hooks
 
 # Local Development

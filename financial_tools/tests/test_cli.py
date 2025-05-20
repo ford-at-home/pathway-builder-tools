@@ -1,116 +1,138 @@
-"""Tests for the CLI interface.
+"""Tests for the CLI interface."""
 
-This module contains tests for the command-line interface of the financial tools
-system, including input handling, function matching, and response formatting.
-"""
+from unittest.mock import Mock, patch
 
-import unittest
-from unittest.mock import patch
+import pytest
 
-from financial_tools.cli.interface import CLI
+from ..cli.interface import FinancialAssistantCLI
+from ..core import call_function_matcher, execute_function
 
 
-class TestCLI(unittest.TestCase):
-    """Test cases for the CLI interface."""
+@pytest.fixture
+def cli():
+    """Create a CLI instance for testing."""
+    return FinancialAssistantCLI(user_id="test_user")
 
-    def setUp(self) -> None:
-        """Set up test fixtures."""
-        self.cli = CLI()
 
-    def test_handle_user_request(self) -> None:
-        """Test handling of user requests."""
-        test_cases = [
-            (
-                "what are my recurring payments",
-                "get_subscriptions",
-                {
-                    "subscriptions": [
-                        {"name": "Spotify", "amount": "9.99", "frequency": "monthly"},
-                        {"name": "Netflix", "amount": "15.99", "frequency": "monthly"},
-                    ]
-                },
-            ),
-            (
-                "show me available financial products",
-                "get_products",
-                {
-                    "products": [
-                        {
-                            "name": "High-Yield Savings",
-                            "category": "Savings",
-                            "features": ["4.5% APY", "No minimum balance"],
-                        }
-                    ]
-                },
-            ),
-            (
-                "what are my financial goals",
-                "get_goals",
-                {
-                    "goals": [
-                        {"name": "Emergency Fund", "current": 5000, "target": 10000}
-                    ]
-                },
-            ),
+@pytest.fixture
+def mock_function_matcher():
+    """Mock the function matcher response."""
+    with patch("financial_tools.cli.interface.call_function_matcher") as mock:
+        yield mock
+
+
+@pytest.fixture
+def mock_function_executor():
+    """Mock the function executor response."""
+    with patch("financial_tools.cli.interface.execute_function") as mock:
+        yield mock
+
+
+def test_cli_initialization(cli):
+    """Test that the CLI initializes with the correct user ID."""
+    assert cli.user_id == "test_user"
+
+
+def test_handle_user_request_exit(cli):
+    """Test that the CLI handles exit commands correctly."""
+    with patch("builtins.input", return_value="exit"):
+        assert cli.handle_user_request() is None
+
+
+def test_handle_user_request_empty(cli):
+    """Test that the CLI handles empty input correctly."""
+    with patch("builtins.input", return_value=""):
+        assert cli.handle_user_request() == "Please provide a request."
+
+
+def test_handle_user_request_subscriptions(
+    cli, mock_function_matcher, mock_function_executor
+):
+    """Test that the CLI handles subscription requests correctly."""
+    # Mock the function matcher response
+    mock_function_matcher.return_value = {
+        "function_id": "get_subscriptions",
+        "parameters": {},
+        "title": "Get Subscriptions",
+        "description": "List all subscriptions",
+    }
+
+    # Mock the function executor response
+    mock_function_executor.return_value = {
+        "subscriptions": [{"name": "Netflix", "amount": 15.99, "frequency": "monthly"}]
+    }
+
+    with patch("builtins.input", return_value="show my subscriptions"):
+        response = cli.handle_user_request()
+        assert "Netflix" in response
+        assert "15.99" in response
+        assert "monthly" in response
+
+
+def test_handle_user_request_unknown(cli, mock_function_matcher):
+    """Test that the CLI handles unknown requests correctly."""
+    mock_function_matcher.return_value = {
+        "function_id": "none",
+        "parameters": {},
+        "title": "Unknown Request",
+        "description": "Could not match request",
+    }
+
+    with patch("builtins.input", return_value="tell me a joke"):
+        response = cli.handle_user_request()
+        assert "not equipped to help" in response
+
+
+def test_handle_user_request_error(cli, mock_function_matcher):
+    """Test that the CLI handles errors correctly."""
+    mock_function_matcher.side_effect = Exception("Test error")
+
+    with patch("builtins.input", return_value="show subscriptions"):
+        response = cli.handle_user_request()
+        assert "Error" in response
+        assert "Test error" in response
+
+
+def test_main_flow(cli, mock_function_matcher, mock_function_executor):
+    """Test the main CLI flow with a complete interaction."""
+    # Mock the function matcher response
+    mock_function_matcher.return_value = {
+        "function_id": "get_products",
+        "parameters": {},
+        "title": "Get Products",
+        "description": "List available products",
+    }
+
+    # Mock the function executor response
+    mock_function_executor.return_value = {
+        "products": [
+            {
+                "name": "Savings Account",
+                "description": "High-yield savings",
+                "min_amount": 100,
+                "max_amount": 100000,
+            }
         ]
+    }
 
-        for cmd, expected_function, mock_response in test_cases:
-            with self.subTest(cmd=cmd), patch(
-                "financial_tools.core.function_matcher.FunctionMatcher"
-                ".match_function"
-            ) as mock_match, patch(
-                "financial_tools.core.function_matcher.FunctionMatcher"
-                ".execute_function"
-            ) as mock_execute:
-                # Set up mock responses
-                mock_match.return_value = {"function_id": expected_function}
-                mock_execute.return_value = mock_response
+    # Mock user input sequence
+    input_sequence = ["show products", "n"]
+    with patch("builtins.input", side_effect=input_sequence):
+        with patch("builtins.print") as mock_print:
+            cli.main()
 
-                # Test the request handling
-                response = self.cli.handle_user_request(cmd)
-                self.assertIsNotNone(response)
-                self.assertIn(expected_function, str(mock_match.call_args))
-
-    def test_format_response(self) -> None:
-        """Test response formatting for different data types."""
-        # Test subscription formatting
-        sub_response = {
-            "subscriptions": [
-                {"name": "Spotify", "amount": "9.99", "frequency": "monthly"},
-                {"name": "Netflix", "amount": "15.99", "frequency": "monthly"},
+            # Verify welcome message was displayed
+            welcome_calls = [
+                call
+                for call in mock_print.call_args_list
+                if "Hi, I'm your CLI financial tool assistant" in str(call)
             ]
-        }
-        formatted = self.cli.format_response(sub_response)
-        self.assertIn("Spotify", formatted)
-        self.assertIn("Netflix", formatted)
-        self.assertIn("$9.99", formatted)
-        self.assertIn("$15.99", formatted)
+            assert len(welcome_calls) > 0
 
-        # Test product formatting
-        product_response = {
-            "products": [
-                {
-                    "name": "High-Yield Savings",
-                    "category": "Savings",
-                    "features": ["4.5% APY", "No minimum balance"],
-                }
+            # Verify product information was displayed
+            product_calls = [
+                call
+                for call in mock_print.call_args_list
+                if "Savings Account" in str(call)
             ]
-        }
-        formatted = self.cli.format_response(product_response)
-        self.assertIn("High-Yield Savings", formatted)
-        self.assertIn("Savings", formatted)
-        self.assertIn("4.5% APY", formatted)
-
-        # Test goal formatting
-        goal_response = {
-            "goals": [{"name": "Emergency Fund", "current": 5000, "target": 10000}]
-        }
-        formatted = self.cli.format_response(goal_response)
-        self.assertIn("Emergency Fund", formatted)
-        self.assertIn("$5000", formatted)
-        self.assertIn("$10000", formatted)
-        self.assertIn("50.0%", formatted)
-
-
-if __name__ == "__main__":
-    unittest.main()
+            assert len(product_calls) > 0

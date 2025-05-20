@@ -1,145 +1,151 @@
-"""Lambda function for summarizing financial data using Claude.
+"""Lambda function to summarize financial tool responses.
 
-This module provides a Lambda function that takes responses from various financial
-tools (subscriptions, products, goals) and generates natural language summaries
-using Amazon Bedrock's Claude model.
+This module provides a Lambda function that takes responses from the subscriptions,
+products, and goals tools and generates a natural language summary using Amazon
+Bedrock's Claude model.
 """
 
 import json
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 import boto3
-from aws_lambda_powertools import Logger
-from aws_lambda_powertools.utilities.typing import LambdaContext
 
-# Initialize AWS client and logger
-# We use Bedrock for the Claude model to generate natural language summaries
-# The logger helps track summarization requests and any errors
+# Initialize Bedrock client
 bedrock = boto3.client("bedrock-runtime")
-logger = Logger()
+
+# Initialize Lambda client for invoking other functions
+lambda_client = boto3.client("lambda")
 
 
-def summarize_data(data: Dict[str, Any], function_id: str) -> str:
-    """Summarize financial data using Claude.
+def invoke_function(function_name: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Invoke a Lambda function and return its response.
 
     Args:
-        data: The financial data to summarize
-        function_id: The ID of the function that generated the data
+        function_name: Name of the Lambda function to invoke
+        payload: Payload to send to the function
 
     Returns:
-        A natural language summary of the data
+        Dict containing the function's response
     """
-    # Construct the prompt based on the function type
-    # Each function type gets a specialized prompt that guides Claude
-    # to summarize the data in a context-appropriate way
-    if function_id == "get_subscriptions":
-        # For subscriptions, focus on monthly costs and notable services
-        system_prompt = (
-            "You are a financial assistant. Summarize the user's subscription "
-            "data in a friendly, conversational way. Include the total monthly "
-            "cost and highlight any notable subscriptions.\n\n"
-            "Data:\n{data}\n\n"
-            "Summary:"
-        )
-    elif function_id == "get_products":
-        # For products, group similar offerings and highlight key features
-        system_prompt = (
-            "You are a financial advisor. Summarize the available financial "
-            "products in a helpful way. Group similar products and highlight "
-            "key features that would be relevant to the user.\n\n"
-            "Data:\n{data}\n\n"
-            "Summary:"
-        )
-    elif function_id == "get_goals":
-        # For goals, focus on progress and next steps
-        system_prompt = (
-            "You are a financial coach. Summarize the user's financial goals "
-            "in an encouraging way. Include progress towards each goal and "
-            "suggest next steps if appropriate.\n\n"
-            "Data:\n{data}\n\n"
-            "Summary:"
-        )
-    else:
-        # Generic prompt for unknown function types
-        system_prompt = (
-            "You are a financial assistant. Summarize the following data in a "
-            "clear, helpful way. Focus on the most important information and "
-            "present it in a user-friendly format.\n\n"
-            "Data:\n{data}\n\n"
-            "Summary:"
-        )
+    response = lambda_client.invoke(
+        FunctionName=function_name,
+        Payload=json.dumps(payload),
+    )
+    return json.loads(response["Payload"].read())
 
+
+def get_summary_prompt(
+    subscriptions: Optional[List[Dict[str, Any]]] = None,
+    products: Optional[List[Dict[str, Any]]] = None,
+    goals: Optional[List[Dict[str, Any]]] = None,
+) -> str:
+    """Generate a prompt for Claude to summarize the financial data.
+
+    Args:
+        subscriptions: List of subscription data
+        products: List of product data
+        goals: List of goal data
+
+    Returns:
+        A prompt string for Claude
+    """
+    prompt_parts = ["Please provide a concise summary of the following financial data:"]
+
+    if subscriptions:
+        prompt_parts.append("\nSubscriptions:")
+        for sub in subscriptions:
+            prompt_parts.append(
+                f"- {sub['name']}: ${sub['amount']} {sub['frequency']} "
+                f"({sub['category']})"
+            )
+
+    if products:
+        prompt_parts.append("\nAvailable Financial Products:")
+        for prod in products:
+            prompt_parts.append(
+                f"- {prod['name']}: {prod['description']} "
+                f"(Interest: {prod['interest_rate']}%, "
+                f"Term: {prod['term_years']} years)"
+            )
+
+    if goals:
+        prompt_parts.append("\nFinancial Goals:")
+        for goal in goals:
+            progress = (goal["current_amount"] / goal["target_amount"]) * 100
+            prompt_parts.append(
+                f"- {goal['name']}: ${goal['current_amount']} of "
+                f"${goal['target_amount']} ({progress:.1f}%) "
+                f"by {goal['target_date']}"
+            )
+
+    prompt_parts.append(
+        "\nPlease provide a natural, conversational summary of this information, "
+        "highlighting key insights and any notable patterns or concerns. "
+        "Keep the summary concise but informative."
+    )
+
+    return "\n".join(prompt_parts)
+
+
+def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
+    """Handle requests to summarize financial data.
+
+    This function can be called in two ways:
+    1. With a user_id to fetch and summarize all data for that user
+    2. With pre-fetched data in the event payload
+
+    Args:
+        event: The event payload containing either:
+            - user_id: ID of the user to summarize data for
+            - OR pre-fetched data in subscriptions, products, and goals fields
+        context: Lambda context object
+
+    Returns:
+        Dict containing:
+            - summary: Natural language summary of the financial data
+            - statusCode: HTTP status code
+    """
     try:
-        # Call Claude via Bedrock
-        # We use a higher temperature (0.7) for more natural summaries
-        # and allow more tokens for detailed responses
+        # Get data either from event or by invoking other functions
+        if "user_id" in event:
+            user_id = event["user_id"]
+            subscriptions = invoke_function("subscriptions", {"user_id": user_id}).get(
+                "body", []
+            )
+            products = invoke_function("products", {}).get("body", [])
+            goals = invoke_function("goals", {"user_id": user_id}).get("body", [])
+        else:
+            subscriptions = event.get("subscriptions", [])
+            products = event.get("products", [])
+            goals = event.get("goals", [])
+
+        # Generate summary using Claude
+        prompt = get_summary_prompt(subscriptions, products, goals)
         response = bedrock.invoke_model(
             modelId="anthropic.claude-3-sonnet-20240229-v1:0",
             body=json.dumps(
                 {
-                    "max_tokens": 500,  # Allow longer summaries for detailed data
-                    "temperature": 0.7,  # Higher temperature for more natural language
+                    "anthropic_version": "bedrock-2023-05-31",
+                    "max_tokens": 1000,
                     "messages": [
                         {
                             "role": "user",
-                            "content": system_prompt.format(
-                                data=json.dumps(
-                                    data, indent=2
-                                )  # Pretty-print data for clarity
-                            ),
+                            "content": prompt,
                         }
                     ],
                 }
             ),
         )
-
-        # Parse and return the summary
-        # Strip whitespace to clean up the response
         response_body = json.loads(response["body"].read())
-        return response_body["content"][0]["text"].strip()
+        summary = response_body["content"][0]["text"]
+
+        return {
+            "statusCode": 200,
+            "body": summary,
+        }
 
     except Exception as e:
-        # Log the full error for debugging
-        # This helps track down issues with Bedrock or response parsing
-        logger.error(f"Error summarizing data: {str(e)}", exc_info=True)
-        raise
-
-
-@logger.inject_lambda_context
-def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
-    """Handle Lambda invocation to summarize financial data.
-
-    Args:
-        event: Lambda event containing the data to summarize
-        context: Lambda context
-
-    Returns:
-        Dict containing either:
-        - The summarized data
-        - An error response with statusCode
-    """
-    try:
-        # Get and validate input data from event
-        # The function_id helps determine how to summarize the data
-        data = event.get("data", {})
-        function_id = event.get("function_id", "")
-
-        if not data:
-            return {
-                "statusCode": 400,
-                "body": json.dumps({"error": "No data provided"}),
-            }
-
-        # Generate summary using Claude
-        # The summary will be tailored to the type of data
-        summary = summarize_data(data, function_id)
-
-        # Return the summary in a consistent format
-        # This makes it easy for clients to parse the response
-        return {"statusCode": 200, "body": json.dumps({"summary": summary})}
-
-    except Exception as e:
-        # Log the full error for debugging
-        # This helps track down issues with the Lambda function
-        logger.error(f"Error in handler: {str(e)}", exc_info=True)
-        return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
+        return {
+            "statusCode": 500,
+            "body": f"Error generating summary: {str(e)}",
+        }
